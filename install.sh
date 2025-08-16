@@ -21,6 +21,19 @@ CONFIG_DIR="/etc/augment-oauth"
 LOG_DIR="/var/log/augment-oauth"
 USER="augment"
 
+# GitHub镜像配置（支持中国大陆访问）
+GITHUB_API_BASE="https://api.github.com"
+GITHUB_RELEASE_BASE="https://github.com"
+
+# 检测是否需要使用镜像
+if curl -s --connect-timeout 5 "$GITHUB_API_BASE" >/dev/null 2>&1; then
+    echo "使用官方GitHub API"
+else
+    echo "GitHub访问受限，尝试使用镜像站点"
+    GITHUB_API_BASE="https://api.github.com"
+    GITHUB_RELEASE_BASE="https://gh.registry.cyou"
+fi
+
 # 检测系统架构和操作系统
 detect_platform() {
     local os=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -58,45 +71,47 @@ detect_platform() {
 # 获取最新版本
 get_latest_version() {
     echo -e "${BLUE}🔍 获取最新版本信息...${NC}"
-    LATEST_VERSION=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-    
+    LATEST_VERSION=$(curl -s "$GITHUB_API_BASE/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+
     if [ -z "$LATEST_VERSION" ]; then
         echo -e "${RED}❌ 无法获取最新版本信息${NC}"
         exit 1
     fi
-    
+
     echo -e "${GREEN}✅ 最新版本: $LATEST_VERSION${NC}"
 }
 
 # 下载二进制文件
 download_binary() {
     local binary_name="$SERVICE_NAME-$PLATFORM"
-    local download_url="https://github.com/$REPO/releases/download/$LATEST_VERSION/$binary_name"
-    
+    local download_url="$GITHUB_RELEASE_BASE/$REPO/releases/download/$LATEST_VERSION/$binary_name"
+
     echo -e "${BLUE}📥 下载二进制文件...${NC}"
     echo -e "${BLUE}URL: $download_url${NC}"
-    
+
     # 创建临时目录
     local temp_dir=$(mktemp -d)
-    cd "$temp_dir"
-    
+    local binary_path="$temp_dir/$SERVICE_NAME"
+
     # 下载文件
-    if ! curl -L -o "$SERVICE_NAME" "$download_url"; then
+    if ! curl -L -o "$binary_path" "$download_url"; then
         echo -e "${RED}❌ 下载失败${NC}"
         exit 1
     fi
-    
+
     # 验证文件
-    if [ ! -f "$SERVICE_NAME" ]; then
+    if [ ! -f "$binary_path" ]; then
         echo -e "${RED}❌ 下载的文件不存在${NC}"
         exit 1
     fi
-    
+
     # 设置执行权限
-    chmod +x "$SERVICE_NAME"
-    
+    chmod +x "$binary_path"
+
     echo -e "${GREEN}✅ 下载完成${NC}"
-    echo "$temp_dir/$SERVICE_NAME"
+
+    # 返回文件路径（不使用echo避免颜色代码干扰）
+    printf "%s" "$binary_path"
 }
 
 # 安装二进制文件
