@@ -86,32 +86,32 @@ download_binary() {
     local binary_name="$SERVICE_NAME-$PLATFORM"
     local download_url="$GITHUB_RELEASE_BASE/$REPO/releases/download/$LATEST_VERSION/$binary_name"
 
-    echo -e "${BLUE}📥 下载二进制文件...${NC}"
-    echo -e "${BLUE}URL: $download_url${NC}"
+    echo -e "${BLUE}📥 下载二进制文件...${NC}" >&2
+    echo -e "${BLUE}URL: $download_url${NC}" >&2
 
     # 创建临时目录
     local temp_dir=$(mktemp -d)
     local binary_path="$temp_dir/$SERVICE_NAME"
 
     # 下载文件
-    if ! curl -L -o "$binary_path" "$download_url"; then
-        echo -e "${RED}❌ 下载失败${NC}"
+    if ! curl -L -o "$binary_path" "$download_url" >&2; then
+        echo -e "${RED}❌ 下载失败${NC}" >&2
         exit 1
     fi
 
     # 验证文件
     if [ ! -f "$binary_path" ]; then
-        echo -e "${RED}❌ 下载的文件不存在${NC}"
+        echo -e "${RED}❌ 下载的文件不存在${NC}" >&2
         exit 1
     fi
 
     # 设置执行权限
     chmod +x "$binary_path"
 
-    echo -e "${GREEN}✅ 下载完成${NC}"
+    echo -e "${GREEN}✅ 下载完成${NC}" >&2
 
-    # 返回文件路径（不使用echo避免颜色代码干扰）
-    printf "%s" "$binary_path"
+    # 只输出文件路径到stdout
+    echo "$binary_path"
 }
 
 # 安装二进制文件
