@@ -64,7 +64,7 @@ jobs:
         echo 'linker = "aarch64-linux-gnu-gcc"' >> ~/.cargo/config.toml
 
     - name: Cache cargo registry
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -87,7 +87,7 @@ jobs:
         cp target/${{ matrix.target }}/release/augment-oauth-service.exe ${{ matrix.name }}
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.name }}
         path: ${{ matrix.name }}
@@ -101,7 +101,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
 
     - name: Create checksums
       run: |
@@ -124,21 +124,21 @@ jobs:
 
     - name: Create Release
       id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.version.outputs.version }}
-        release_name: Augment OAuth Service ${{ steps.version.outputs.version }}
+        name: Augment OAuth Service ${{ steps.version.outputs.version }}
         body: |
           ## Augment OAuth Service ${{ steps.version.outputs.version }}
-          
+
           ### 🚀 Features
           - OAuth 2.0 PKCE flow implementation
           - Unified API response format
           - Cross-platform binary releases
           - One-click deployment script
-          
+
           ### 📦 Downloads
           Choose the appropriate binary for your platform:
           - **Linux x86_64**: `augment-oauth-service-linux-x86_64`
@@ -146,12 +146,12 @@ jobs:
           - **macOS x86_64**: `augment-oauth-service-macos-x86_64`
           - **macOS ARM64**: `augment-oauth-service-macos-aarch64`
           - **Windows x86_64**: `augment-oauth-service-windows-x86_64.exe`
-          
+
           ### 🛠️ Quick Install
           ```bash
           # Linux/macOS one-click install
           curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
-          
+
           # Or manual download
           curl -L -o augment-oauth-service https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/augment-oauth-service-linux-x86_64
           chmod +x augment-oauth-service
@@ -159,30 +159,6 @@ jobs:
           ```
         draft: false
         prerelease: false
-
-    - name: Upload Release Assets
-      run: |
-        for dir in augment-oauth-service-*; do
-          if [ -d "$dir" ]; then
-            asset_path="$dir/$(ls "$dir")"
-            asset_name="$(basename "$asset_path")"
-            echo "Uploading $asset_name..."
-            curl -X POST \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary @"$asset_path" \
-              "https://uploads.github.com/repos/${{ github.repository }}/releases/${{ steps.create_release.outputs.id }}/assets?name=$asset_name"
-          fi
-        done
-        
-        # Upload checksums
-        for checksum_file in checksums-*.txt; do
-          if [ -f "$checksum_file" ]; then
-            echo "Uploading $checksum_file..."
-            curl -X POST \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Content-Type: text/plain" \
-              --data-binary @"$checksum_file" \
-              "https://uploads.github.com/repos/${{ github.repository }}/releases/${{ steps.create_release.outputs.id }}/assets?name=$checksum_file"
-          fi
-        done
+        files: |
+          augment-oauth-service-*/augment-oauth-service*
+          checksums-*.txt
