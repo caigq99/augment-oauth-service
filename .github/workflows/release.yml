@@ -11,6 +11,10 @@ on:
         required: true
         default: 'v1.0.0'
 
+permissions:
+  contents: write
+  packages: write
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -125,9 +129,8 @@ jobs:
     - name: Create Release
       id: create_release
       uses: softprops/action-gh-release@v2
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
+        token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
         tag_name: ${{ steps.version.outputs.version }}
         name: Augment OAuth Service ${{ steps.version.outputs.version }}
         body: |
