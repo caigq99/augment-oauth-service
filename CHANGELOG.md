@@ -7,6 +7,10 @@
 
 ## [未发布]
 
+### 修复
+
+- 修复 GitHub Actions Changelog 工作流
+
 ### 文档
 
 - 自动更新 Changelog 到 v1.2.0
