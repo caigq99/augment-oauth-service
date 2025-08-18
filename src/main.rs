@@ -5,15 +5,17 @@ use axum::{
 };
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
-use tracing::info;
+use tracing::{error, info};
 
-mod oauth;
-mod models;
+mod config;
 mod handlers;
 mod middleware;
+mod models;
+mod oauth;
 
-use oauth::OAuthService;
+use config::{get_available_server_addr, AppConfig};
 use models::ApiResponse;
+use oauth::OAuthService;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -22,8 +24,32 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() {
+    // 加载配置
+    let mut config = match AppConfig::load() {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!("配置加载失败: {}", e);
+            std::process::exit(1);
+        }
+    };
+
     // 初始化日志
     tracing_subscriber::fmt::init();
+
+    info!("Augment OAuth Service 正在启动...");
+    info!(
+        "配置信息: 主机={}, 端口={}",
+        config.server.host, config.server.port
+    );
+
+    // 获取可用的服务器地址
+    let server_addr = match get_available_server_addr(&mut config).await {
+        Ok(addr) => addr,
+        Err(e) => {
+            error!("无法获取可用的服务器地址: {}", e);
+            std::process::exit(1);
+        }
+    };
 
     // 创建OAuth服务
     let oauth_service = Arc::new(OAuthService::new());
@@ -40,13 +66,24 @@ async fn main() {
         .with_state(app_state);
 
     // 启动服务器
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
-        .await
-        .unwrap();
-    
-    info!("Augment OAuth Service 启动在 http://0.0.0.0:3000");
-    
-    axum::serve(listener, app).await.unwrap();
+    let listener = match tokio::net::TcpListener::bind(server_addr).await {
+        Ok(listener) => listener,
+        Err(e) => {
+            error!("无法绑定到地址 {}: {}", server_addr, e);
+            std::process::exit(1);
+        }
+    };
+
+    info!("Augment OAuth Service 启动成功！");
+    info!("服务地址: http://{}", server_addr);
+    info!("健康检查: http://{}/health", server_addr);
+    info!("获取授权链接: http://{}/api/auth-url", server_addr);
+    info!("完成授权: http://{}/api/complete-auth", server_addr);
+
+    if let Err(e) = axum::serve(listener, app).await {
+        error!("服务器运行错误: {}", e);
+        std::process::exit(1);
+    }
 }
 
 async fn health_check() -> Json<ApiResponse<serde_json::Value>> {
@@ -56,5 +93,8 @@ async fn health_check() -> Json<ApiResponse<serde_json::Value>> {
         "timestamp": chrono::Utc::now()
     });
 
-    Json(ApiResponse::success_with_message(data, "服务运行正常".to_string()))
+    Json(ApiResponse::success_with_message(
+        data,
+        "服务运行正常".to_string(),
+    ))
 }
