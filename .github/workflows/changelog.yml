@@ -3,15 +3,15 @@ name: 自动生成 Changelog
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: '指定标签 (可选)'
+        description: "指定标签 (可选)"
         required: false
         type: string
       unreleased:
-        description: '生成未发布的更改'
+        description: "生成未发布的更改"
         required: false
         type: boolean
         default: false
@@ -30,6 +30,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref_name || 'main' }}
 
       - name: 安装 git-cliff
         uses: taiki-e/install-action@v2
@@ -40,89 +41,71 @@ jobs:
         id: changelog
         run: |
           echo "🔄 生成 Changelog..."
-          
+
+          # 备份原文件
+          cp CHANGELOG.md CHANGELOG.md.backup || true
+
           # 根据输入参数构建命令
-          CLIFF_ARGS="--output CHANGELOG.md"
-          
           if [ "${{ github.event.inputs.unreleased }}" = "true" ]; then
-            CLIFF_ARGS="$CLIFF_ARGS --unreleased"
             echo "📝 生成未发布的更改"
-          fi
-          
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            CLIFF_ARGS="$CLIFF_ARGS --tag ${{ github.event.inputs.tag }}"
+            git-cliff --unreleased --output CHANGELOG.md
+          elif [ -n "${{ github.event.inputs.tag }}" ]; then
             echo "🏷️ 生成到标签: ${{ github.event.inputs.tag }}"
+            git-cliff --tag "${{ github.event.inputs.tag }}" --output CHANGELOG.md
+          else
+            echo "📋 生成完整 changelog"
+            git-cliff --output CHANGELOG.md
           fi
-          
-          # 执行 git-cliff
-          git-cliff $CLIFF_ARGS
-          
+
           # 检查是否有更改
-          if git diff --quiet CHANGELOG.md; then
+          if [ -f CHANGELOG.md.backup ] && cmp -s CHANGELOG.md CHANGELOG.md.backup; then
             echo "📄 Changelog 没有更改"
             echo "changed=false" >> $GITHUB_OUTPUT
           else
             echo "✅ Changelog 已更新"
             echo "changed=true" >> $GITHUB_OUTPUT
-            
+
             # 获取文件信息
-            FILE_SIZE=$(stat -c%s CHANGELOG.md)
-            LINE_COUNT=$(wc -l < CHANGELOG.md)
-            echo "📊 文件大小: $FILE_SIZE 字节"
-            echo "📏 总行数: $LINE_COUNT 行"
+            if [ -f CHANGELOG.md ]; then
+              FILE_SIZE=$(stat -c%s CHANGELOG.md)
+              LINE_COUNT=$(wc -l < CHANGELOG.md)
+              echo "📊 文件大小: $FILE_SIZE 字节"
+              echo "📏 总行数: $LINE_COUNT 行"
+            fi
           fi
+
+          # 清理备份文件
+          rm -f CHANGELOG.md.backup
 
       - name: 提交 Changelog
         if: steps.changelog.outputs.changed == 'true'
         run: |
           echo "📝 提交 Changelog 更改..."
-          
+
           # 配置 Git
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          
-          # 提交更改
-          git add CHANGELOG.md
-          git commit -m "docs: 自动更新 Changelog
-          
-          - 通过 GitHub Actions 自动生成
-          - 基于 git-cliff 工具
-          - 包含最新的提交历史"
-          
-          # 推送更改
-          git push origin HEAD:main
 
-      - name: 创建 Pull Request (可选)
-        if: steps.changelog.outputs.changed == 'true' && github.event_name == 'workflow_dispatch'
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "docs: 自动更新 Changelog"
-          title: "📝 自动更新 Changelog"
-          body: |
-            ## 📋 自动生成的 Changelog 更新
-            
-            这个 PR 包含了自动生成的 Changelog 更新。
-            
-            ### 🔄 更改内容
-            - 基于最新的 Git 提交历史生成
-            - 使用 git-cliff 工具自动格式化
-            - 遵循 Keep a Changelog 格式规范
-            
-            ### 🤖 自动化信息
-            - **触发方式**: ${{ github.event_name }}
-            - **工作流**: ${{ github.workflow }}
-            - **运行ID**: ${{ github.run_id }}
-            
-            请检查生成的内容是否正确，然后合并此 PR。
-          branch: changelog-update
-          delete-branch: true
+          # 添加并提交更改
+          git add CHANGELOG.md
+
+          # 检查是否有内容需要提交
+          if git diff --staged --quiet; then
+            echo "没有更改需要提交"
+            exit 0
+          fi
+
+          # 提交更改
+          git commit -m "docs: 自动更新 Changelog [skip ci]"
+
+          # 推送更改
+          git push
 
       - name: 输出摘要
         run: |
           echo "## 📋 Changelog 生成摘要" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ "${{ steps.changelog.outputs.changed }}" = "true" ]; then
             echo "✅ **状态**: Changelog 已更新并提交" >> $GITHUB_STEP_SUMMARY
             echo "📄 **文件**: CHANGELOG.md" >> $GITHUB_STEP_SUMMARY
@@ -130,13 +113,13 @@ jobs:
           else
             echo "📄 **状态**: Changelog 没有更改" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🛠️ 工具信息" >> $GITHUB_STEP_SUMMARY
           echo "- **工具**: git-cliff" >> $GITHUB_STEP_SUMMARY
           echo "- **配置**: cliff.toml" >> $GITHUB_STEP_SUMMARY
           echo "- **格式**: Keep a Changelog" >> $GITHUB_STEP_SUMMARY
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📝 手动使用" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
