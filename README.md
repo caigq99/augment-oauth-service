@@ -13,6 +13,7 @@
 - 🔧 智能端口管理 - 自动检测端口占用并查找可用端口
 - ⚙️ 灵活配置支持 - 环境变量、配置文件、命令行参数
 - 🔄 零停机启动 - 端口冲突时自动切换到可用端口
+- 📋 自动 Changelog - 基于 Git 提交历史自动生成更新日志
 
 ## 统一返回格式
 
@@ -242,6 +243,9 @@ curl -X POST "http://localhost:3000/api/complete-auth" \
 augment-oauth-service/
 ├── Cargo.toml          # 项目依赖配置
 ├── .env                # 环境变量配置文件 (可选)
+├── cliff.toml          # git-cliff 配置文件 (新增)
+├── Makefile            # Make 命令支持 (新增)
+├── CHANGELOG.md        # 自动生成的更新日志
 ├── src/
 │   ├── main.rs         # 主程序入口，包含智能端口管理
 │   ├── config.rs       # 配置管理模块 (新增)
@@ -249,6 +253,18 @@ augment-oauth-service/
 │   ├── models.rs       # 数据模型
 │   ├── oauth.rs        # OAuth 服务逻辑
 │   └── middleware.rs   # 中间件和错误处理
+├── scripts/            # 脚本目录 (新增)
+│   ├── changelog.ps1   # PowerShell changelog 脚本
+│   ├── generate-changelog.sh # Bash changelog 脚本
+│   └── setup-git-hooks.sh    # Git hooks 设置脚本
+├── docs/               # 文档目录 (新增)
+│   ├── API.md          # API 文档
+│   ├── CONFIGURATION.md # 配置指南
+│   ├── DEPLOYMENT.md   # 部署指南
+│   ├── DEVELOPMENT.md  # 开发指南
+│   └── CHANGELOG_AUTOMATION.md # Changelog 自动化指南
+├── .github/workflows/  # GitHub Actions (新增)
+│   └── changelog.yml   # 自动 changelog 工作流
 ├── start.sh            # 启动脚本
 ├── install.sh          # 一键安装脚本
 └── README.md           # 项目说明
@@ -286,6 +302,12 @@ augment-oauth-service/
 - **Config**: 配置文件管理
 - **Tracing**: 结构化日志记录
 - **Tracing-subscriber**: 日志订阅器
+
+### 开发工具
+
+- **git-cliff**: 自动生成 Changelog
+- **Conventional Commits**: 提交消息规范
+- **GitHub Actions**: CI/CD 自动化
 
 ### 时间和网络
 
@@ -479,13 +501,68 @@ echo "HOST=127.0.0.1" >> .env
 
 安装后的配置文件位置：`/etc/augment-oauth/config.env`
 
+## 📋 Changelog 自动化
+
+项目集成了 `git-cliff` 工具，可以自动生成符合 [Keep a Changelog](https://keepachangelog.com/) 格式的更新日志。
+
+### 快速使用
+
+```bash
+# Windows (PowerShell)
+.\scripts\changelog.ps1
+
+# Linux/macOS
+./scripts/generate-changelog.sh
+
+# 使用 Makefile (Linux/macOS)
+make changelog
+```
+
+### 自动化设置
+
+```bash
+# 设置 Git hooks 自动生成 changelog
+./scripts/setup-git-hooks.sh
+
+# 移除 Git hooks
+./scripts/remove-git-hooks.sh
+```
+
+### 提交规范
+
+使用 [Conventional Commits](https://www.conventionalcommits.org/) 规范：
+
+```
+feat: 添加新功能
+fix: 修复问题
+docs: 更新文档
+perf: 性能优化
+refactor: 代码重构
+test: 测试相关
+chore: 构建、工具等
+```
+
+详细使用指南请参考：[Changelog 自动化指南](docs/CHANGELOG_AUTOMATION.md)
+
 ## 发布流程
 
 ### 创建新版本
 
 ```bash
-# 发布新版本 (自动构建跨平台二进制文件)
-./release.sh v1.0.0
+# 1. 提交代码
+git add .
+git commit -m "feat: 新功能实现"
+
+# 2. 生成 changelog
+.\scripts\changelog.ps1  # Windows
+./scripts/generate-changelog.sh  # Linux/macOS
+
+# 3. 创建版本标签
+git tag -a v1.0.0 -m "Release v1.0.0"
+
+# 4. 推送到远程
+git push origin main
+git push origin v1.0.0
 ```
 
 ### GitHub Actions
@@ -496,8 +573,9 @@ echo "HOST=127.0.0.1" >> .env
 2. 构建 macOS (x86_64, ARM64) 二进制文件
 3. 构建 Windows (x86_64) 二进制文件
 4. 生成 SHA256 校验和
-5. 创建 GitHub Release
-6. 上传所有构建产物
+5. 自动更新 Changelog
+6. 创建 GitHub Release
+7. 上传所有构建产物
 
 ### 支持的平台
 
